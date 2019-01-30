@@ -21,9 +21,7 @@ case class Comment(url: Url, body: Body, user: UserLogin)
 
 case class User(login: String, name: String)
 
-trait Endpoint[A] {
-  def toUri(fa: A): String
-}
+case class Endpoint[A](toUri: A => String)
 
 object Endpoint {
   def apply[A](fa: A)(implicit E: Endpoint[A]): String = E.toUri(fa)
