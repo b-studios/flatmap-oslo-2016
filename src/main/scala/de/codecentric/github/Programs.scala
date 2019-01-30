@@ -16,11 +16,11 @@ trait ApplicativePrograms {
   import GitHubDsl._
   def getUsers(logins: List[UserLogin]
   ): GitHubApplicative[List[User]] =
-    logins.traverseU(getUser)
+    logins.traverse(getUser)
 
   val scalaIssues: GitHubApplicative[List[Issue]] =
     List("scala","scala-dev","slip","scala-lang").
-      traverseU(repo =>
+      traverse(repo =>
         listIssues(Owner("scala"),Repo(repo))).
       map(_.flatten)
 
@@ -36,7 +36,7 @@ trait ApplicativePrograms {
     val userLogins = extractLogins(p).toList
 
     val fetched: F[List[User]] =
-      userLogins.traverseU(getUser).foldMap(interp)
+      userLogins.traverse(getUser).foldMap(interp)
 
     Functor[F].map(fetched)(userLogins.zip(_).toMap)
   }

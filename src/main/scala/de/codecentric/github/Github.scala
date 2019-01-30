@@ -105,7 +105,7 @@ object GitHubInterp {
           fa.analyze(requestedLogins).toList
 
         val fetched: Future[List[User]] =
-          userLogins.traverseU(u=>getUser(u)).foldMap(step(client))
+          userLogins.traverse(u => getUser(u)).foldMap(step(client))
 
         val futureMapping: Future[Map[UserLogin,User]] =
           fetched.map(userLogins.zip(_).toMap)
