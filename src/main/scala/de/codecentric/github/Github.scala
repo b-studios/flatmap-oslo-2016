@@ -10,7 +10,6 @@ import cats.std.future._
 import cats.std.list._
 import cats.std.set._
 import cats.syntax.traverse._
-import play.api.libs.json._
 import scala.concurrent.Future
 
 sealed trait GitHub[A]
@@ -66,14 +65,13 @@ object GitHub {
 object GitHubDsl extends Serializable {
   type GitHubApplicative[A] = FreeApplicative[GitHub, A]
   type GitHubMonadic[A] = Free[GitHub, A]
-  type GitHubBoth[A] = Free[Coproduct[GitHub,GitHubApplicative,?],A]
+  type GitHubBoth[A] = Free[GitHubApplicative, A]
 
   def getCommentsMonad(owner: Owner, repo: Repo, issue: Issue): GitHubMonadic[List[Comment]] =
     Free.liftF(GetComments(owner, repo, issue))
 
   def getCommentsM(owner: Owner, repo: Repo, issue: Issue): GitHubBoth[List[Comment]] =
-    Free.liftF[Coproduct[GitHub,GitHubApplicative,?],List[Comment]](
-      Coproduct.left[GitHubApplicative](GetComments(owner, repo, issue)))
+    embed { getComments(owner, repo, issue) }
 
   def getComments(owner: Owner, repo: Repo, issue: Issue): GitHubApplicative[List[Comment]] =
     FreeApplicative.lift(GetComments(owner, repo, issue))
@@ -81,9 +79,7 @@ object GitHubDsl extends Serializable {
   def getUserMonad(login: UserLogin): GitHubMonadic[User] =
     Free.liftF(GetUser(login))
 
-  def getUserM(login: UserLogin): GitHubBoth[User] =
-    Free.liftF[Coproduct[GitHub,GitHubApplicative,?],User](
-      Coproduct.left[GitHubApplicative](GetUser(login)))
+  def getUserM(login: UserLogin): GitHubBoth[User] = embed { getUser(login) }
 
   def getUser(login: UserLogin): GitHubApplicative[User] =
     FreeApplicative.lift(GetUser(login))
@@ -92,14 +88,13 @@ object GitHubDsl extends Serializable {
     Free.liftF(ListIssues(owner,repo))
 
   def listIssuesM(owner: Owner, repo: Repo): GitHubBoth[List[Issue]] =
-    Free.liftF[Coproduct[GitHub,GitHubApplicative,?],List[Issue]](
-      Coproduct.left[GitHubApplicative](ListIssues(owner,repo)))
+    embed { listIssues(owner, repo) }
 
   def listIssues(owner: Owner, repo: Repo): GitHubApplicative[List[Issue]] =
     FreeApplicative.lift(ListIssues(owner,repo))
 
   def embed[A](p: GitHubApplicative[A]): GitHubBoth[A] =
-    Free.liftF[Coproduct[GitHub,GitHubApplicative,?],A](Coproduct.right(p))
+    Free.liftF[GitHubApplicative, A](p)
 }
 
 object GitHubInterp {

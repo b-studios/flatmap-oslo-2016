@@ -4,7 +4,6 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import cats._
 import cats.`~>`
-import cats.data.Coproduct
 import cats.std.future._
 import cats.std.list._
 import cats.std.set._
@@ -102,22 +101,21 @@ trait Programs {
     }
   } yield users
 
-  def allUsersM(owner: Owner, repo: Repo):
-      GitHubBoth[List[(Issue,List[(Comment,User)])]] = for {
+  def allUsersM(owner: Owner, repo: Repo): GitHubBoth[List[(Issue,List[(Comment,User)])]] = for {
 
-    issues <- listIssuesM(owner,repo)
+    issues <- embed { listIssues(owner,repo) }
 
-        issueComments <- embed {
-          issues.traverseU(issue =>
-            getComments(owner,repo,issue).map((issue,_)))
-        }
+    issueComments <- embed {
+      issues.traverseU(issue =>
+        getComments(owner,repo,issue).map((issue,_)))
+    }
 
-        users <- embed {
-          issueComments.traverseU { case (issue,comments) =>
-            comments.traverseU(comment =>
-              getUser(comment.user).map((comment,_))).map((issue,_))
-          }
-        }
+    users <- embed {
+      issueComments.traverseU { case (issue,comments) =>
+        comments.traverseU(comment =>
+          getUser(comment.user).map((comment,_))).map((issue,_))
+      }
+    }
   } yield users
 
   def userNamesFromIssueComments(
@@ -181,8 +179,7 @@ object Webclient {
   def both[A](p: GitHubBoth[A]): A = {
     import GitHubInterp._
     withClient { client =>
-      Await.result(p.foldMap(step(client).or[GitHubApplicative](stepApOpt(client))),
-        5.minutes)
+      Await.result(p.foldMap(stepApOpt(client)), 5.minutes)
     }
   }
 
@@ -196,9 +193,9 @@ object Webclient {
     withClient { client =>
 
       if (doApplicative) {
-        val parallel: Coproduct[GitHub,GitHubApplicative,?] ~> Future = {
+        val parallel: GitHubApplicative ~> Future = {
           import GitHubInterp._
-          step(client).or[GitHubApplicative](stepApPar(client))
+          stepApPar(client)
         }
 
         println("©"*80)
@@ -210,9 +207,9 @@ object Webclient {
       }
 
       if (doMonadic) {
-        val sequential: Coproduct[GitHub,GitHubApplicative,?] ~> Future = {
+        val sequential: GitHubApplicative ~> Future = {
           import GitHubInterp._
-          step(client).or[GitHubApplicative](stepAp(client))
+          stepAp(client)
         }
         println("©"*80)
         println("Monadic program:")
@@ -222,10 +219,9 @@ object Webclient {
       }
 
       if (doOptimized) {
-        val optimized: Coproduct[GitHub,GitHubApplicative,?] ~> Future = {
+        val optimized: GitHubApplicative ~> Future = {
           import GitHubInterp._
-          step(client).or[GitHubApplicative](stepApOpt(client))
-
+          stepApOpt(client)
         }
 
         println("©"*80)
